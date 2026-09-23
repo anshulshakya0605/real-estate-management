@@ -1,0 +1,58 @@
+import express from "express";
+import { requestIdMiddleware } from "./middleware/requestId.middleware";
+import { errorMiddleware } from "./middleware/error.middleware";
+import { notFoundMiddleware } from "./middleware/notFound.middleware";
+import helmet from "helmet";
+import { API, APP_CONFIG } from "./shared/constants";
+import { pinoHttp } from "pino-http";
+import logger from "./config/logger";
+import authRouter from "./modules/auth/auth.routes.js";
+
+
+
+const app = express();
+
+app.use(requestIdMiddleware);
+
+app.use(helmet());
+
+app.get("/", (req, res) => {
+    req.log.info("Request received");
+    
+    res.json({
+        requestId: req.id,
+    });
+});
+
+app.use(express.json({
+    limit: APP_CONFIG.JSON_BODY_LIMIT
+}))
+
+app.use(
+    pinoHttp({
+        logger,
+        genReqId: (req) => req.id
+    })
+)
+
+const apiRouter = express.Router();
+
+app.use(
+    API.BASE_PATH,
+    apiRouter
+)
+
+app.get('/health', (req, res) => {
+    res.json("Server health is good");
+    
+})
+
+apiRouter.use(
+    "/auth",
+    authRouter,
+);
+
+app.use(notFoundMiddleware)
+app.use(errorMiddleware)
+
+export default app;

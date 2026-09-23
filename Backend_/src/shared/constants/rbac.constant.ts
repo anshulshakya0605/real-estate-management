@@ -1,0 +1,38 @@
+import { PERMISSIONS, type Permission } from "./permission.constant.js";
+import { ROLES, type Role } from "./role.constant.js";
+
+export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
+    [ROLES.ADMIN]: Object.values(PERMISSIONS),
+
+    [ROLES.EMPLOYEE]: [
+        PERMISSIONS.EMPLOYEE_VIEW,
+        PERMISSIONS.EMPLOYEE_UPDATE,
+
+        PERMISSIONS.TASK_VIEW,
+        PERMISSIONS.TASK_UPDATE,
+        PERMISSIONS.TASK_STATUS_UPDATE,
+
+        PERMISSIONS.SITE_VIEW,
+        PERMISSIONS.SITE_PROGRESS_VIEW,
+
+        PERMISSIONS.FLOOR_PLAN_VIEW,
+        PERMISSIONS.FLOOR_PLAN_CREATE,
+
+        PERMISSIONS.MAP_VIEW,
+    ],
+
+    [ROLES.CLIENT]: [
+        PERMISSIONS.CLIENT_VIEW,
+
+        PERMISSIONS.SITE_VIEW,
+        PERMISSIONS.SITE_PROGRESS_VIEW,
+
+        PERMISSIONS.TASK_VIEW,
+
+        PERMISSIONS.FLOOR_PLAN_VIEW,
+        PERMISSIONS.FLOOR_PLAN_APPROVE,
+        PERMISSIONS.FLOOR_PLAN_REJECT,
+
+        PERMISSIONS.MAP_VIEW,
+    ],
+} as const;

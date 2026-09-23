@@ -1,0 +1,8 @@
+export enum Trade {
+    MASON = "MASON",
+    PLUMBER = "PLUMBER",
+    ELECTRICIAN = "ELECTRICIAN",
+    PAINTER = "PAINTER",
+    ARCHITECT = "ARCHITECT",
+    SUPERVISOR = "SUPERVISOR",
+}

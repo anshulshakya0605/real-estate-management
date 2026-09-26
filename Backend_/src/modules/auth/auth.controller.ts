@@ -81,8 +81,16 @@ export const resendVerification = async (
     res: Response,
 ): Promise<void> => {
 
+    // const input = req.body;
+    console.log("RESEND BODY:", req.body);
+
+        const input = req.body;
+
+        console.log("RESEND INPUT:", input);
+        console.log("RESEND EMAIL:", input.email);
+
     await authService.resendVerification(
-        req.body.email,
+        input,
     );
 
     sendSuccess(

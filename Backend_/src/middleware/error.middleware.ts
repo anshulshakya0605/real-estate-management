@@ -163,12 +163,13 @@ export const errorMiddleware: ErrorRequestHandler = (
             "MongoDB server error",
         );
     } else {
-        req.log.error(
-            {
-                error,
-            },
-            "Unhandled application error",
-        );
+       logger.error(
+    {
+        err: error,
+        requestId: req.id,
+    },
+    "Unhandled application error",
+);
     }
 
     const response: {

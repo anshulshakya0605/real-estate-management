@@ -50,6 +50,7 @@ import {
 import {
     generateAccessToken,
     generateResetTicket,
+    verifyResetTicket,
 } from "../../utils/jwt.js";
 
 import * as authRepository from "./auth.repository.js";
@@ -62,13 +63,14 @@ import type {
     LoginResponse,
     RegisterClientInput,
     RegisterEmployeeInput,
+    ResendVerificationInput,
     ResetPasswordInput,
     VerifyEmailInput,
     VerifyResetOtpInput,
     VerifyResetOtpResponse,
 } from "./auth.types.js";
 import { Types } from "mongoose";
-import { sendVerificationOtpEmail } from "../email/email.service.js";
+import { sendPasswordChangedEmail, sendPasswordResetOtpEmail, sendVerificationOtpEmail, sendWelcomeEmail } from "../email/email.service.js";
 
 
 /**
@@ -108,11 +110,9 @@ const mapUserResponse = (
 export const registerEmployee = async (
     input: RegisterEmployeeInput,
 ): Promise<void> => {
-
-    const existingUser =
-        await authRepository.findUserByEmailWithoutPassword(
-            input.email,
-        );
+    const existingUser = await authRepository.findUserByEmail(
+        input.email,
+    );
 
     if (existingUser) {
         throw new ApiError({
@@ -122,31 +122,67 @@ export const registerEmployee = async (
         });
     }
 
-    const passwordHash =
-        await hashPassword(input.password);
+    if (input.phone) {
+        const existingPhone =
+            await authRepository.findUserByPhone(input.phone);
+
+        if (existingPhone) {
+            throw new ApiError({
+                statusCode: HTTP_STATUS.CONFLICT,
+                message: REGISTER_MESSAGES.PHONE_EXISTS,
+                errorCode: ERROR_CODES.REG_PHONE_EXISTS,
+            });
+        }
+    }
+
+    const passwordHash = await hashPassword(input.password);
 
     const user = await authRepository.createUser({
         email: input.email,
         passwordHash,
         fullName: input.fullName,
         phone: input.phone,
-        role: Role.EMPLOYEE,
         city: input.city,
-        accountStatus:
-            AccountStatus.PENDING_VERIFICATION,
+        role: Role.EMPLOYEE,
+        accountStatus: AccountStatus.PENDING_VERIFICATION,
         isActive: true,
         emailVerified: false,
     });
 
-    await authRepository.createEmployee({
-        userId: user._id,
-        trade: input.trade,
-        employeeCode: await generateEmployeeCode(),
-    });
+    try {
+        await authRepository.createEmployee({
+            userId: user._id,
+            trade: input.trade,
+            employeeCode:
+                await authRepository.generateEmployeeCode(),
+        });
 
-    await createVerificationOtp(
-        String(user._id),
-    );
+        const otp = generateOtp();
+        const otpHash = await hashOtp(otp);
+
+        await authRepository.invalidateActiveOtps(
+            String(user._id),
+            TokenPurpose.EMAIL_VERIFICATION,
+        );
+
+        await authRepository.createOtp({
+            userId: user._id,
+            otpHash,
+            purpose: TokenPurpose.EMAIL_VERIFICATION,
+            expiresAt: getOtpExpiryDate(),
+            attempts: 0,
+            usedAt: null,
+        });
+
+        await sendVerificationOtpEmail({
+            to: user.email,
+            fullName: user.fullName,
+            otp,
+        });
+    } catch (error) {
+        await authRepository.deleteUser(String(user._id));
+        throw error;
+    }
 };
 
 
@@ -156,11 +192,9 @@ export const registerEmployee = async (
 export const registerClient = async (
     input: RegisterClientInput,
 ): Promise<void> => {
-
-    const existingUser =
-        await authRepository.findUserByEmailWithoutPassword(
-            input.email,
-        );
+    const existingUser = await authRepository.findUserByEmail(
+        input.email,
+    );
 
     if (existingUser) {
         throw new ApiError({
@@ -170,8 +204,20 @@ export const registerClient = async (
         });
     }
 
-    const passwordHash =
-        await hashPassword(input.password);
+    if (input.phone) {
+        const existingPhone =
+            await authRepository.findUserByPhone(input.phone);
+
+        if (existingPhone) {
+            throw new ApiError({
+                statusCode: HTTP_STATUS.CONFLICT,
+                message: REGISTER_MESSAGES.PHONE_EXISTS,
+                errorCode: ERROR_CODES.REG_PHONE_EXISTS,
+            });
+        }
+    }
+
+    const passwordHash = await hashPassword(input.password);
 
     const user = await authRepository.createUser({
         email: input.email,
@@ -179,21 +225,44 @@ export const registerClient = async (
         fullName: input.fullName,
         phone: input.phone,
         role: Role.CLIENT,
-        accountStatus:
-            AccountStatus.PENDING_VERIFICATION,
+        accountStatus: AccountStatus.PENDING_VERIFICATION,
         isActive: true,
         emailVerified: false,
     });
 
-    await authRepository.createClient({
-        userId: user._id,
-        companyName: input.companyName,
-        gstNumber: input.gstNumber,
-    });
+    try {
+        await authRepository.createClient({
+            userId: user._id,
+            companyName: input.companyName,
+            gstNumber: input.gstNumber,
+        });
 
-    await createVerificationOtp(
-        String(user._id),
-    );
+        const otp = generateOtp();
+        const otpHash = await hashOtp(otp);
+
+        await authRepository.invalidateActiveOtps(
+            String(user._id),
+            TokenPurpose.EMAIL_VERIFICATION,
+        );
+
+        await authRepository.createOtp({
+            userId: user._id,
+            otpHash,
+            purpose: TokenPurpose.EMAIL_VERIFICATION,
+            expiresAt: getOtpExpiryDate(),
+            attempts: 0,
+            usedAt: null,
+        });
+
+        await sendVerificationOtpEmail({
+            to: user.email,
+            fullName: user.fullName,
+            otp,
+        });
+    } catch (error) {
+        await authRepository.deleteUser(String(user._id));
+        throw error;
+    }
 };
 
 
@@ -203,11 +272,9 @@ export const registerClient = async (
 export const verifyEmail = async (
     input: VerifyEmailInput,
 ): Promise<void> => {
-
-    const user =
-        await authRepository.findUserByEmailWithoutPassword(
-            input.email,
-        );
+    const user = await authRepository.findUserByEmail(
+        input.email,
+    );
 
     if (!user) {
         throw new ApiError({
@@ -220,16 +287,15 @@ export const verifyEmail = async (
     if (user.emailVerified) {
         throw new ApiError({
             statusCode: HTTP_STATUS.CONFLICT,
-            message: VERIFICATION_MESSAGES.ALREADY_VERIFIED,
+            message: VERIFICATION_MESSAGES.EMAIL_VERIFIED_SUCCESS,
             errorCode: ERROR_CODES.AUTH_EMAIL_NOT_VERIFIED,
         });
     }
 
-    const otp =
-        await authRepository.findLatestActiveOtp(
-            String(user._id),
-            TokenPurpose.EMAIL_VERIFICATION,
-        );
+    const otp = await authRepository.findLatestActiveOtp(
+        String(user._id),
+        TokenPurpose.EMAIL_VERIFICATION,
+    );
 
     if (!otp) {
         throw new ApiError({
@@ -239,10 +305,7 @@ export const verifyEmail = async (
         });
     }
 
-    if (
-        otp.attempts >=
-        CONFIG.OTP_MAX_ATTEMPTS
-    ) {
+    if (otp.attempts >= CONFIG.OTP_MAX_ATTEMPTS) {
         throw new ApiError({
             statusCode: HTTP_STATUS.TOO_MANY_REQUESTS,
             message: VERIFICATION_MESSAGES.OTP_MAX_ATTEMPTS,
@@ -250,13 +313,22 @@ export const verifyEmail = async (
         });
     }
 
-    const isValid =
-        await compareOtp(
-            input.otp,
-            otp.otpHash,
-        );
+    console.log(
+    "OTP PROVIDED:",
+    Boolean(input.otp),
+);
 
-    if (!isValid) {
+console.log(
+    "OTP HASH FOUND:",
+    Boolean(otp.otpHash),
+);
+
+    const isOtpValid = await compareOtp(
+        input.otp,
+        otp.otpHash,
+    );
+
+    if (!isOtpValid) {
         const updatedOtp =
             await authRepository.incrementOtpAttempts(
                 String(otp._id),
@@ -264,8 +336,7 @@ export const verifyEmail = async (
 
         if (
             updatedOtp &&
-            updatedOtp.attempts >=
-                CONFIG.OTP_MAX_ATTEMPTS
+            updatedOtp.attempts >= CONFIG.OTP_MAX_ATTEMPTS
         ) {
             throw new ApiError({
                 statusCode: HTTP_STATUS.TOO_MANY_REQUESTS,
@@ -285,7 +356,7 @@ export const verifyEmail = async (
         String(otp._id),
     );
 
-    const newAccountStatus =
+    const nextAccountStatus =
         user.role === Role.EMPLOYEE
             ? AccountStatus.PENDING_APPROVAL
             : AccountStatus.ACTIVE;
@@ -294,9 +365,14 @@ export const verifyEmail = async (
         String(user._id),
         {
             emailVerified: true,
-            accountStatus: newAccountStatus,
+            accountStatus: nextAccountStatus,
         },
     );
+
+    await sendWelcomeEmail({
+        to: user.email,
+        fullName: user.fullName,
+    });
 };
 
 
@@ -304,13 +380,16 @@ export const verifyEmail = async (
  * Resend email verification OTP.
  */
 export const resendVerification = async (
-    email: string,
+    input: ResendVerificationInput,
 ): Promise<void> => {
-
-    const user =
-        await authRepository.findUserByEmailWithoutPassword(
-            email,
-        );
+    console.log("1. RESEND START");
+    const user = await authRepository.findUserByEmail(
+        input.email,
+    );
+    console.log(
+        "2. USER FOUND:",
+        user ? user.email : null,
+    );
 
     if (!user) {
         throw new ApiError({
@@ -319,23 +398,43 @@ export const resendVerification = async (
             errorCode: ERROR_CODES.USER_NOT_FOUND,
         });
     }
+     console.log("3. EMAIL VERIFIED:", user.emailVerified);
+
 
     if (user.emailVerified) {
         throw new ApiError({
             statusCode: HTTP_STATUS.CONFLICT,
-            message: VERIFICATION_MESSAGES.ALREADY_VERIFIED,
+            message: VERIFICATION_MESSAGES.EMAIL_VERIFIED_SUCCESS,
             errorCode: ERROR_CODES.AUTH_EMAIL_NOT_VERIFIED,
         });
     }
+    console.log("4. INVALIDATING OLD OTP");
 
     await authRepository.invalidateActiveOtps(
         String(user._id),
         TokenPurpose.EMAIL_VERIFICATION,
     );
+ console.log("5. OLD OTP INVALIDATED");
+    const otp = generateOtp();
+    console.log("6. OTP GENERATED");
+    const otpHash = await hashOtp(otp);
 
-    await createVerificationOtp(
-        String(user._id),
-    );
+    await authRepository.createOtp({
+        userId: user._id,
+        otpHash,
+        purpose: TokenPurpose.EMAIL_VERIFICATION,
+        expiresAt: getOtpExpiryDate(),
+        attempts: 0,
+        usedAt: null,
+    });
+     console.log("8. OTP SAVED");
+
+    await sendVerificationOtpEmail({
+        to: user.email,
+        fullName: user.fullName,
+        otp,
+    });
+     console.log("9. EMAIL SENT");
 };
 
 
@@ -345,11 +444,9 @@ export const resendVerification = async (
 export const login = async (
     input: LoginInput,
 ): Promise<LoginResponse> => {
-
-    const user =
-        await authRepository.findUserByEmail(
-            input.email,
-        );
+    const user = await authRepository.findUserByEmail(
+        input.email,
+    );
 
     if (!user) {
         throw new ApiError({
@@ -383,12 +480,11 @@ export const login = async (
             statusCode: HTTP_STATUS.FORBIDDEN,
             message: AUTH_MESSAGES.ACCOUNT_PENDING_APPROVAL,
             errorCode: ERROR_CODES.AUTH_ACCOUNT_PENDING_APPROVAL,
-       } );
+        });
     }
 
     if (
-        user.accountStatus !==
-        AccountStatus.ACTIVE
+        user.accountStatus !== AccountStatus.ACTIVE
     ) {
         throw new ApiError({
             statusCode: HTTP_STATUS.FORBIDDEN,
@@ -397,11 +493,10 @@ export const login = async (
         });
     }
 
-    const passwordValid =
-        await comparePassword(
-            input.password,
-            user.passwordHash,
-        );
+    const passwordValid = await comparePassword(
+        input.password,
+        user.passwordHash,
+    );
 
     if (!passwordValid) {
         throw new ApiError({
@@ -447,12 +542,14 @@ export const login = async (
 export const forgotPassword = async (
     input: ForgotPasswordInput,
 ): Promise<void> => {
+    const user = await authRepository.findUserByEmail(
+        input.email,
+    );
 
-    const user =
-        await authRepository.findUserByEmailWithoutPassword(
-            input.email,
-        );
-
+    /*
+     * Always return success when user doesn't exist.
+     * This prevents email enumeration.
+     */
     if (!user) {
         return;
     }
@@ -463,7 +560,6 @@ export const forgotPassword = async (
     );
 
     const otp = generateOtp();
-
     const otpHash = await hashOtp(otp);
 
     await authRepository.createOtp({
@@ -472,16 +568,14 @@ export const forgotPassword = async (
         purpose: TokenPurpose.PASSWORD_RESET,
         expiresAt: getOtpExpiryDate(),
         attempts: 0,
+        usedAt: null,
     });
-    sendVerificationOtpEmail(
-        {
-            to: user.email,
-            fullName: user.fullName,
-            otp
-        }
-    )
-    // Email sending will be connected here
-    // through the email module.
+
+    await sendPasswordResetOtpEmail({
+        to: user.email,
+        fullName: user.fullName,
+        otp,
+    });
 };
 
 
@@ -491,30 +585,27 @@ export const forgotPassword = async (
 export const verifyResetOtp = async (
     input: VerifyResetOtpInput,
 ): Promise<VerifyResetOtpResponse> => {
-
-    const user =
-        await authRepository.findUserByEmailWithoutPassword(
-            input.email,
-        );
+    const user = await authRepository.findUserByEmail(
+        input.email,
+    );
 
     if (!user) {
         throw new ApiError({
             statusCode: HTTP_STATUS.BAD_REQUEST,
-            message: PASSWORD_MESSAGES.INVALID_RESET_OTP,
+            message: PASSWORD_MESSAGES.RESET_TICKET_INVALID,
             errorCode: ERROR_CODES.OTP_INVALID,
         });
     }
 
-    const otp =
-        await authRepository.findLatestActiveOtp(
-            String(user._id),
-            TokenPurpose.PASSWORD_RESET,
-        );
+    const otp = await authRepository.findLatestActiveOtp(
+        String(user._id),
+        TokenPurpose.PASSWORD_RESET,
+    );
 
     if (!otp) {
         throw new ApiError({
             statusCode: HTTP_STATUS.GONE,
-            message: VERIFICATION_MESSAGES.OTP_EXPIRED,
+            message: PASSWORD_MESSAGES.RESET_TICKET_EXPIRED,
             errorCode: ERROR_CODES.OTP_EXPIRED,
         });
     }
@@ -530,14 +621,12 @@ export const verifyResetOtp = async (
         });
     }
 
-    const isValid =
-        await compareOtp(
-            input.otp,
-            otp.otpHash,
-        );
+    const isOtpValid = await compareOtp(
+        input.otp,
+        otp.otpHash,
+    );
 
-    if (!isValid) {
-
+    if (!isOtpValid) {
         const updatedOtp =
             await authRepository.incrementOtpAttempts(
                 String(otp._id),
@@ -546,7 +635,7 @@ export const verifyResetOtp = async (
         if (
             updatedOtp &&
             updatedOtp.attempts >=
-                CONFIG.OTP_MAX_ATTEMPTS
+            CONFIG.OTP_MAX_ATTEMPTS
         ) {
             throw new ApiError({
                 statusCode: HTTP_STATUS.TOO_MANY_REQUESTS,
@@ -557,16 +646,15 @@ export const verifyResetOtp = async (
 
         throw new ApiError({
             statusCode: HTTP_STATUS.BAD_REQUEST,
-            message: PASSWORD_MESSAGES.INVALID_RESET_OTP,
+            message: VERIFICATION_MESSAGES.OTP_INVALID,
             errorCode: ERROR_CODES.OTP_INVALID,
         });
     }
 
-    const resetTicket =
-        generateResetTicket({
-            userId: String(user._id),
-            purpose: TokenPurpose.PASSWORD_RESET,
-        });
+    const resetTicket = generateResetTicket({
+        userId: String(user._id),
+        purpose: TokenPurpose.PASSWORD_RESET,
+    });
 
     return {
         resetTicket,
@@ -580,16 +668,12 @@ export const verifyResetOtp = async (
 export const resetPassword = async (
     input: ResetPasswordInput,
 ): Promise<void> => {
-
-    let payload;
+    let ticketPayload;
 
     try {
-        payload = await import("../../utils/jwt.js")
-            .then(({ verifyResetTicket }) =>
-                verifyResetTicket(
-                    input.resetTicket,
-                ),
-            );
+        ticketPayload = verifyResetTicket(
+            input.resetTicket,
+        );
     } catch {
         throw new ApiError({
             statusCode: HTTP_STATUS.UNAUTHORIZED,
@@ -598,21 +682,9 @@ export const resetPassword = async (
         });
     }
 
-    if (
-        payload.purpose !==
-        TokenPurpose.PASSWORD_RESET
-    ) {
-        throw new ApiError({
-            statusCode: HTTP_STATUS.UNAUTHORIZED,
-            message: PASSWORD_MESSAGES.RESET_TICKET_INVALID,
-            errorCode: ERROR_CODES.AUTH_TOKEN_INVALID,
-        });
-    }
-
-    const user =
-        await authRepository.findUserById(
-            payload.userId,
-        );
+    const user = await authRepository.findUserById(
+        ticketPayload.userId,
+    );
 
     if (!user) {
         throw new ApiError({
@@ -622,46 +694,30 @@ export const resetPassword = async (
         });
     }
 
-    const samePassword =
-        await comparePassword(
-            input.newPassword,
-            user.passwordHash,
-        );
+    const passwordHash = await hashPassword(
+        input.newPassword,
+    );
 
-    if (samePassword) {
-        throw new ApiError({
-            statusCode: HTTP_STATUS.BAD_REQUEST,
-            message: PASSWORD_MESSAGES.SAME_AS_OLD,
-            errorCode: ERROR_CODES.PWD_SAME_AS_OLD,
-        });
-    }
-
-    const recentPasswords =
+    const recentHistories =
         await authRepository.findRecentPasswordHistories(
             String(user._id),
             CONFIG.PASSWORD_HISTORY_LIMIT,
         );
 
-    for (const history of recentPasswords) {
-        const reused =
-            await comparePassword(
-                input.newPassword,
-                history.passwordHash,
-            );
+    for (const history of recentHistories) {
+        const reused = await comparePassword(
+            input.newPassword,
+            history.passwordHash,
+        );
 
         if (reused) {
             throw new ApiError({
                 statusCode: HTTP_STATUS.BAD_REQUEST,
-                message: PASSWORD_MESSAGES.REUSED_PASSWORD,
+                message: PASSWORD_MESSAGES.SAME_AS_OLD,
                 errorCode: ERROR_CODES.PWD_SAME_AS_OLD,
             });
         }
     }
-
-    const newPasswordHash =
-        await hashPassword(
-            input.newPassword,
-        );
 
     await authRepository.createPasswordHistory({
         userId: user._id,
@@ -671,9 +727,19 @@ export const resetPassword = async (
     await authRepository.updateUser(
         String(user._id),
         {
-            passwordHash: newPasswordHash,
+            passwordHash,
         },
     );
+
+    await authRepository.invalidateActiveOtps(
+        String(user._id),
+        TokenPurpose.PASSWORD_RESET,
+    );
+
+    await sendPasswordChangedEmail({
+        to: user.email,
+        fullName: user.fullName,
+    });
 };
 
 
@@ -684,11 +750,9 @@ export const changePassword = async (
     userId: string,
     input: ChangePasswordInput,
 ): Promise<void> => {
-
-    const user =
-        await authRepository.findUserById(
-            userId,
-        );
+    const user = await authRepository.findUserById(
+        userId,
+    );
 
     if (!user) {
         throw new ApiError({
@@ -726,37 +790,36 @@ export const changePassword = async (
         });
     }
 
-    const recentPasswords =
+    const recentHistories =
         await authRepository.findRecentPasswordHistories(
             userId,
             CONFIG.PASSWORD_HISTORY_LIMIT,
         );
 
-    for (const history of recentPasswords) {
-        const reused =
-            await comparePassword(
-                input.newPassword,
-                history.passwordHash,
-            );
+    for (const history of recentHistories) {
+        const reused = await comparePassword(
+            input.newPassword,
+            history.passwordHash,
+        );
 
         if (reused) {
             throw new ApiError({
                 statusCode: HTTP_STATUS.BAD_REQUEST,
-                message: PASSWORD_MESSAGES.REUSED_PASSWORD,
+                message: PASSWORD_MESSAGES.SAME_AS_OLD,
                 errorCode: ERROR_CODES.PWD_SAME_AS_OLD,
             });
         }
     }
 
-    await authRepository.createPasswordHistory({
-        userId: user._id,
-        passwordHash: user.passwordHash,
-    });
-
     const newPasswordHash =
         await hashPassword(
             input.newPassword,
         );
+
+    await authRepository.createPasswordHistory({
+        userId: user._id,
+        passwordHash: user.passwordHash,
+    });
 
     await authRepository.updateUser(
         userId,
@@ -764,6 +827,11 @@ export const changePassword = async (
             passwordHash: newPasswordHash,
         },
     );
+
+    await sendPasswordChangedEmail({
+        to: user.email,
+        fullName: user.fullName,
+    });
 };
 
 
@@ -773,11 +841,9 @@ export const changePassword = async (
 export const getMe = async (
     userId: string,
 ): Promise<AuthUserResponse> => {
-
-    const user =
-        await authRepository.findUserById(
-            userId,
-        );
+    const user = await authRepository.findUserById(
+        userId,
+    );
 
     if (!user) {
         throw new ApiError({
@@ -794,7 +860,7 @@ export const getMe = async (
 /**
  * Logout is stateless with the current JWT design.
  */
-export const logout = async (): Promise<void> => {
+export const  logout = async (): Promise<void> => {
     return;
 };
 

@@ -20,8 +20,17 @@ import {
 export const findUserByEmail = async (
     email: string,
 ): Promise<IUser | null> => {
-    return User.findOne({ email })
+
+    // const normalizedEmail = email.trim().toLowerCase();
+
+     console.log("SEARCH EMAIL:", JSON.stringify(email));
+    console.log("DATABASE:", User.db.name);
+    console.log("COLLECTION:", User.collection.name);
+
+    const user = await User.findOne({ email })
         .select("+passwordHash");
+        console.log("FOUND USER:", user ? user.email : null);
+    return user;
 };
 
 export const findUserById = async (
@@ -37,6 +46,15 @@ export const findUserByEmailWithoutPassword = async (
     return User.findOne({ email });
 };
 
+export const findUserByPhone = async (
+    phone: string,
+) => {
+    return User.findOne({
+        phone,
+    });
+};
+
+
 export const createUser = async (
     data: Partial<IUser>,
 ): Promise<IUser> => {
@@ -45,16 +63,23 @@ export const createUser = async (
 
 export const updateUser = async (
     userId: string,
-    data: Partial<IUser>,
-): Promise<IUser | null> => {
+    update: Partial<IUser>,
+) => {
     return User.findByIdAndUpdate(
         userId,
-        data,
+        update,
         {
             new: true,
             runValidators: true,
         },
-    );
+    ).select("+passwordHash");
+};
+
+
+export const deleteUser = async (
+    userId: string,
+) => {
+    return User.findByIdAndDelete(userId);
 };
 
 export const createEmployee = async (
@@ -81,6 +106,13 @@ export const findClientByUserId = async (
     return Client.findOne({ userId });
 };
 
+export const generateEmployeeCode =
+    async (): Promise<string> => {
+        const count = await Employee.countDocuments();
+
+        return `EMP-${String(count + 1).padStart(5, "0")}`;
+    };
+
 export const createOtp = async (
     data: Partial<IOtpToken>,
 ): Promise<IOtpToken> => {
@@ -98,7 +130,9 @@ export const findLatestActiveOtp = async (
         expiresAt: {
             $gt: new Date(),
         },
-    }).sort({
+    })
+    .select("+otpHash")
+    .sort({
         createdAt: -1,
     });
 };

@@ -71,6 +71,7 @@ export const EMPLOYEE_MESSAGES = {
     EMPLOYEE_UPDATED: "Employee updated successfully.",
     EMPLOYEE_NOT_FOUND: "Employee not found.",
     EMPLOYEE_APPROVED: "Employee approved successfully.",
+    EMPLOYEE_INVALID_APPROVAL: "Employee Invalid Approval",
     EMPLOYEE_REJECTED: "Employee rejected successfully.",
     TRADE_REQUIRED: "Employee trade is required.",
 } as const;

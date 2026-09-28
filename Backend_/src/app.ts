@@ -7,7 +7,7 @@ import { API, APP_CONFIG } from "./shared/constants";
 import { pinoHttp } from "pino-http";
 import logger from "./config/logger";
 import authRouter from "./modules/auth/auth.routes.js";
-
+import employeeRouter from './modules/employees/employee.routes.js'
 
 
 const app = express();
@@ -51,6 +51,11 @@ apiRouter.use(
     "/auth",
     authRouter,
 );
+
+apiRouter.use(
+    '/employee',
+    employeeRouter
+)
 
 app.use(notFoundMiddleware)
 app.use(errorMiddleware)

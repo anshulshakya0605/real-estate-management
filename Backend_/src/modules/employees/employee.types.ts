@@ -68,7 +68,7 @@ export interface EmployeeWithUser {
         emailVerified: boolean;
     }
 
-    trade?: Trade;
+    trade: Trade;
     employeeCode: string;
     joiningDate: Date;
     isAvailable: boolean;

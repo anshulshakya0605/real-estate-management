@@ -1,10 +1,10 @@
 import { FilterQuery } from "mongoose";
-import { Employee, IEmployee, IUser } from "../../models";
+import { Employee, IEmployee, IUser, User } from "../../models";
 import { EmployeeListQuery, UpdateEmployeeInput } from "./employee.types";
 import { AccountStatus, Role } from "../../shared/enums";
 
 export const findUserById = async (userId: string): Promise<IUser | null> => {
-    return Employee.findOne({userId})
+    return User.findById(userId)
 }
 
 export const findEmployeeById = async (employeeId: string): Promise<IEmployee | null> => {
@@ -54,7 +54,7 @@ export const findEmployeeUserIds = async (filters: Pick<EmployeeListQuery, "city
         userFilter.accountStatus = filters.accountStatus
     }
 
-    const users = await Employee.find(userFilter).select("_id").lean()
+    const users = await User.find(userFilter).select("_id").lean()
     return users.map((user) => user._id);
 }
 
@@ -77,11 +77,15 @@ export const findEmployeesByUserIds = async (
         employeeFilter.isAvailable = filters.availability
     }
 
-    return Employee.find(employeeFilter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit)
+    return Employee.find(employeeFilter)
+    .populate("userId", "email fullName phone city role accountStatus, isActive emailVerified")
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit)
 }
 
 export const countEmployeeByUserIds = async (
-    userIds: IUser["_id"],
+    userIds: IUser["_id"][],
     filters: Pick<EmployeeListQuery, "trade" | "availability">
 ): Promise<number> => {
 
@@ -119,7 +123,7 @@ export const updateUserAccountStatus = async (
     accountStatus: AccountStatus
 ): Promise<IUser | null> => {
 
-    return Employee.findByIdAndUpdate(
+    return User.findByIdAndUpdate(
         userId,
         { accountStatus },
         { new: true, runValidators: true })

@@ -1,23 +1,24 @@
 import { RequestHandler } from "express";
 import { catchAsync } from "../../utils/catchAsync";
 import * as employeeService from './employee.service.js'
-import { sendSuccess } from "../../utils/response";
+import { sendListSuccess, sendSuccess } from "../../utils/response";
 import { EMPLOYEE_MESSAGES, HTTP_STATUS } from "../../shared/constants";
+import { AccountStatus, City, Trade } from "../../shared/enums";
 
 
 export const getEmployees: RequestHandler = catchAsync(
     async (req, res) => {
         const query = {
-            trade: req.query.trade as | typeof req.query.trade | undefined,
+            trade: req.query.trade as Trade | undefined,
 
-            city: req.query.city as | typeof req.query.city | undefined,
+            city: req.query.city as City | undefined,
 
             availability: req.query.availability === 'true'
              ? true
              : req.query.availability === 'false'
              ? false : undefined,
 
-             accountStatus: req.query.accountStatus as | typeof req.query.accountStatus | undefined,
+             accountStatus: req.query.accountStatus as AccountStatus | undefined,
 
              page: req.query.page ? Number(req.query.page) : undefined,
 
@@ -25,12 +26,15 @@ export const getEmployees: RequestHandler = catchAsync(
 
         }
 
-        const result = employeeService.getEmployees(query);
-        return sendSuccess(
+        const result = await employeeService.getEmployees(query);
+        console.log('result: ', result);
+        
+        return sendListSuccess(
             res, 
             HTTP_STATUS.OK,
             EMPLOYEE_MESSAGES.EMPLOYEES_FETCHED,
-            result,
+            result.data,
+            result.pagination,
             String(req.id)
         )
     }

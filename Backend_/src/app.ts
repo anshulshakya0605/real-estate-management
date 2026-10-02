@@ -53,7 +53,7 @@ apiRouter.use(
 );
 
 apiRouter.use(
-    '/employee',
+    '/employees',
     employeeRouter
 )
 

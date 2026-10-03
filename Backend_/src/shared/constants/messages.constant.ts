@@ -82,6 +82,7 @@ export const CLIENT_MESSAGES = {
     CLIENTS_FETCHED: "Clients fetched successfully.",
     CLIENT_UPDATED: "Client updated successfully.",
     CLIENT_NOT_FOUND: "Client not found.",
+    CLIENT_ACCESS_DENIED: "Client access denied"
 } as const;
 
 export const INQUIRY_MESSAGES = {

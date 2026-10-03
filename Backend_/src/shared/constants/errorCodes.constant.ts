@@ -35,6 +35,7 @@ export const ERROR_CODES = {
 
     // Client
     CLIENT_NOT_FOUND: "CLIENT_NOT_FOUND",
+    CLIENT_ACCESS_DENIED: "Client access denied",
 
     // Inquiry
     INQ_NOT_FOUND: "INQ_NOT_FOUND",

@@ -8,6 +8,7 @@ import { pinoHttp } from "pino-http";
 import logger from "./config/logger";
 import authRouter from "./modules/auth/auth.routes.js";
 import employeeRouter from './modules/employees/employee.routes.js'
+import clientsRouter from './modules/clients/client.routes.js'
 
 
 const app = express();
@@ -55,6 +56,11 @@ apiRouter.use(
 apiRouter.use(
     '/employees',
     employeeRouter
+)
+
+apiRouter.use(
+    '/clients',
+    clientsRouter
 )
 
 app.use(notFoundMiddleware)

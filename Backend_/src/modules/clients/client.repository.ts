@@ -1,4 +1,4 @@
-import { Client, IClient } from "../../models";
+import { Client, IClient, Site } from "../../models";
 import { ClientListQuery } from "./client.types";
 
 

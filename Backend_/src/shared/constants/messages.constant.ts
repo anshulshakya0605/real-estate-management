@@ -62,6 +62,7 @@ export const USER_MESSAGES = {
     USER_NOT_FOUND: "User not found.",
     USER_DEACTIVATED: "User deactivated successfully.",
     USER_ACTIVATED: "User activated successfully.",
+    USER_ID_INVALID: "User id is invalid."
 } as const;
 
 export const EMPLOYEE_MESSAGES = {
@@ -83,7 +84,8 @@ export const CLIENT_MESSAGES = {
     CLIENT_UPDATED: "Client updated successfully.",
     CLIENT_NOT_FOUND: "Client not found.",
     CLIENT_ACCESS_DENIED: "Client access denied",
-    CLIENT_EMAIL_EXISTS: 'Client email exists'
+    CLIENT_EMAIL_EXISTS: 'Client email exists',
+    INVALID_CLIENT_ID: "Invalid client id.",
 } as const;
 
 export const INQUIRY_MESSAGES = {
@@ -107,6 +109,7 @@ export const SITE_MESSAGES = {
     SITE_NOT_FOUND: "Site not found.",
     SITE_ACCESS_DENIED: "You do not have access to this site.",
     SITE_PROGRESS_FETCHED: "Site progress fetched successfully.",
+    INVALID_SITE_ID: "Site id is invalid"
 } as const;
 
 export const TASK_MESSAGES = {

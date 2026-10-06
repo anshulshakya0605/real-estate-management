@@ -27,6 +27,7 @@ export const ERROR_CODES = {
     // User
     USER_NOT_FOUND: "USER_NOT_FOUND",
     USER_INACTIVE: "USER_INACTIVE",
+    INVALID_ID: "INVALID_ID",
 
     // Employee
     EMP_NOT_FOUND: "EMP_NOT_FOUND",

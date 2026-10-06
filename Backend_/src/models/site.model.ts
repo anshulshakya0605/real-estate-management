@@ -1,21 +1,54 @@
 import { Document, model, Schema, Types } from "mongoose";
 import { City, SiteStatus, SiteType } from "../shared/enums";
 
-export interface ISite extends Document {
-    _id: Types.ObjectId;
-    name: string;
-    description?: string;
-    siteType: SiteType;
-    status: SiteStatus;
-    city: City;
-    address: string;
-    location?: string;
-    plotAreaSqFt?: number;
-    budget?: number;
-    startDate?: Date;
+
+export interface ILocation {
+    type: "Point";
+    coordinates: [number, number];
 }
 
-const siteSchema = new Schema<ISite> ({
+export interface ISite extends Document {
+    _id: Types.ObjectId;
+
+    name: string;
+    description?: string;
+
+    siteType: SiteType;
+    status: SiteStatus;
+
+    city: City;
+    address: string;
+
+    location?: ILocation;
+
+    plotAreaSqFt?: number;
+    budget?: number;
+
+    startDate?: Date;
+    expectedEndDate?: Date;
+    actualEndDate?: Date;
+
+    createdById: Types.ObjectId;
+    clientId: Types.ObjectId;
+}
+
+const locationSchema = new Schema<ILocation>({
+    type: {
+        type: String,
+        enum: ["Point"],
+        required: true,
+    },
+    coordinates: {
+        type: [Number],
+        required: true,
+    },
+},
+    {
+        _id: false
+    }
+);
+
+const siteSchema = new Schema<ISite>({
     name: {
         type: String,
         required: true,
@@ -36,8 +69,9 @@ const siteSchema = new Schema<ISite> ({
     status: {
         type: String,
         enum: Object.values(SiteStatus),
+        default: SiteStatus.PLANNING,
+        required: true,
         index: true,
-        default: SiteStatus.PLANNING
     },
 
     city: {
@@ -49,29 +83,60 @@ const siteSchema = new Schema<ISite> ({
 
     address: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
 
     location: {
-        type: String,
+        type: locationSchema,
+        index: '2dsphere'
     },
 
     plotAreaSqFt: {
         type: Number,
+        min: 0,
     },
 
     budget: {
-        type: Number
+        type: Number,
+        min: 0
     },
 
     startDate: {
         type: Date
+    },
+
+    expectedEndDate: {
+        type: Date
+    },
+
+    actualEndDate: {
+        type: Date
+    },
+
+    createdById: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+        index: true,
+    },
+
+    clientId: {
+        type: Schema.Types.ObjectId,
+        ref: "Client",
+        required: true,
+        index: true,
     }
 },
-{
-    timestamps: true,
-    collection: 'sites'
-}
+    {
+        timestamps: true,
+        collection: 'sites'
+    }
 );
+
+siteSchema.index({
+    city: 1,
+    status: 1
+})
 
 export const Site = model<ISite>("Site", siteSchema);

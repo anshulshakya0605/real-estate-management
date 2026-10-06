@@ -19,7 +19,7 @@ const mapClientResponse = (client: ClientWithUser): ClientResponse => {
         emailVerified: client.userId.emailVerified,
         companyName: client.companyName,
         gstNumber: client.gstNumber,
-        convertedFromInquiryId: String(client.convertedFromInquiryId),
+        convertedFromInquiryId: client.convertedFromInquiryId?.toString(),
         createdAt: client.createdAt,
         updatedAt: client.updatedAt
     }

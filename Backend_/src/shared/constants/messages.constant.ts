@@ -82,7 +82,8 @@ export const CLIENT_MESSAGES = {
     CLIENTS_FETCHED: "Clients fetched successfully.",
     CLIENT_UPDATED: "Client updated successfully.",
     CLIENT_NOT_FOUND: "Client not found.",
-    CLIENT_ACCESS_DENIED: "Client access denied"
+    CLIENT_ACCESS_DENIED: "Client access denied",
+    CLIENT_EMAIL_EXISTS: 'Client email exists'
 } as const;
 
 export const INQUIRY_MESSAGES = {
@@ -93,6 +94,8 @@ export const INQUIRY_MESSAGES = {
     INQUIRY_STATUS_UPDATED: "Inquiry status updated successfully.",
     INQUIRY_CONVERTED: "Inquiry converted successfully.",
     INQUIRY_ALREADY_CONVERTED: "Inquiry has already been converted.",
+    INQUIRY_ASSIGNED: 'Inquiry assigned successful',
+    INQUIRY_DELETE: 'Inquiry deleted successfully'
 } as const;
 
 export const SITE_MESSAGES = {

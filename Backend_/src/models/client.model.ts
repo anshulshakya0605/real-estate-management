@@ -2,6 +2,7 @@ import { HydratedDocument, model, Schema, Types } from "mongoose";
 
 
 export interface IClient {
+    _id: Types.ObjectId;
     userId: Types.ObjectId;
     companyName?: string;
     gstNumber?: string;
@@ -30,7 +31,7 @@ const clientSchema = new Schema<IClient>(
 
         convertedFromInquiryId: {
             type: Schema.Types.ObjectId,
-            ref: "Inquiry",
+            ref: "inquiries",
         },
     },
     {

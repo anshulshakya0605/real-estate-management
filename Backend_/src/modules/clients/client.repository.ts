@@ -25,3 +25,9 @@ export const findClientById = async (clientId: string): Promise<IClient | null> 
 export const findClientSites = async (clientId: string) => {
     return;
 }
+
+export const deleteClient = async (
+  clientId: string,
+): Promise<IClient | null> => {
+  return Client.findByIdAndDelete(clientId);
+};

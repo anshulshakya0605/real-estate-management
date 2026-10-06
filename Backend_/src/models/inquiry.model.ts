@@ -1,8 +1,9 @@
-import { HydratedDocument, model, Schema, Types } from "mongoose";
+import { Document, model, Schema, Types } from "mongoose";
 import { City, InquiryStatus, SiteType } from "../shared/enums";
 
 
-export interface IInquires {
+export interface IInquiry extends Document {
+    _id: Types.ObjectId;
     fullName: string;
     email: string;
     phone: string;
@@ -18,7 +19,7 @@ export interface IInquires {
     updatedAt: Date;
 }
 
-const inquirySchema = new Schema<IInquires>(
+const inquirySchema = new Schema<IInquiry>(
     {
         fullName: {
             type: String,
@@ -55,14 +56,17 @@ const inquirySchema = new Schema<IInquires>(
 
         plotAreaSqFt: {
             type: Number,
+            min: 0
         },
 
         budgetRange: {
-            type: String
+            type: String,
+            trim: true
         },
 
         message: {
             type: String,
+            trim: true
         },
 
         status: {
@@ -74,11 +78,14 @@ const inquirySchema = new Schema<IInquires>(
         },
 
         assignedToId: {
-            type: Types.ObjectId,
+            type: Schema.Types.ObjectId,
+            ref: 'User',
+            index: true
         },
 
         notes: {
-            type: String
+            type: String,
+            trim: true
         }
     },
     {
@@ -87,6 +94,4 @@ const inquirySchema = new Schema<IInquires>(
     }
 );
 
-export type InquiryDocument = HydratedDocument<IInquires>;
-
-export const Inquiry = model<IInquires>("Inquiry", inquirySchema);
+export const Inquiry = model<IInquiry>("Inquiry", inquirySchema);

@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { CreateSiteInput, SiteListQuery, SiteResponse, SiteWithRelations } from "./site.types";
+import { CreateSiteInput, SiteListQuery, SiteResponse, SiteWithRelations, UpdateSiteInput } from "./site.types";
 import { ApiError } from "../../utils/ApiError";
 import { CLIENT_MESSAGES, ERROR_CODES, HTTP_STATUS, SITE_MESSAGES, USER_MESSAGES } from "../../shared/constants";
 import * as siteRepository from './site.repository.js'
@@ -67,6 +67,7 @@ export const createSite = async (
         budget: input.budget,
         startDate: input.startDate,
         expectedEndDate: input.expectedEndDate,
+        
         clientId: new Types.ObjectId(input.clientId),
         createdById: new Types.ObjectId(createdById),
         status: SiteStatus.PLANNING
@@ -135,5 +136,69 @@ export const getSites = async(query: SiteListQuery) =>{
             totalPages: Math.ceil(total / limit)
         }   
     }
-
 }
+
+export const updateSite = async(
+    siteId: string,
+    input: UpdateSiteInput
+): Promise<SiteResponse> => {
+
+    if (!Types.ObjectId.isValid(siteId)) {
+        throw new ApiError({
+            statusCode: HTTP_STATUS.BAD_REQUEST,
+            message: SITE_MESSAGES.INVALID_SITE_ID,
+            errorCode: ERROR_CODES.INVALID_ID
+        })
+    }
+    
+    const existingSite = await siteRepository.findSiteById(siteId);
+
+    if (!existingSite) {
+        throw new ApiError({
+            statusCode: HTTP_STATUS.NOT_FOUND,
+            message: SITE_MESSAGES.SITE_NOT_FOUND,
+            errorCode: ERROR_CODES.SITE_NOT_FOUND
+        })
+    }
+
+    const updateData: Record<string, unknown> = {...input};
+
+    if (input.clientId) {
+        if (!Types.ObjectId.isValid(input.clientId)) {
+            throw new ApiError({
+                statusCode: HTTP_STATUS.BAD_REQUEST,
+                message: CLIENT_MESSAGES.INVALID_CLIENT_ID,
+                errorCode: ERROR_CODES.INVALID_ID
+            })
+        }
+        updateData.clientId = new Types.ObjectId(input.clientId);
+    }
+
+    const updatedSite = await siteRepository.updateSite(siteId, updateData);
+
+    if (!updatedSite) {
+        throw new ApiError({
+            statusCode: HTTP_STATUS.NOT_FOUND,
+            message: SITE_MESSAGES.SITE_NOT_FOUND,
+            errorCode: ERROR_CODES.SITE_NOT_FOUND
+        })
+    }
+
+    return mapSiteResponse(updatedSite as unknown as SiteWithRelations)
+}
+
+export const deleteSite = async (siteId: string): Promise<SiteResponse> => {
+    const site = await siteRepository.findSiteById(siteId)
+    if (!site) {
+        throw new ApiError({
+            statusCode: HTTP_STATUS.NOT_FOUND,
+            message: SITE_MESSAGES.SITE_NOT_FOUND,
+            errorCode: ERROR_CODES.SITE_NOT_FOUND
+        })
+    }
+
+    const deletedSite = await siteRepository.deleteSite(siteId);
+
+    return mapSiteResponse(deleteSite as unknown as SiteWithRelations)
+}
+

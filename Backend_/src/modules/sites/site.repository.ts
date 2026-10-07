@@ -1,9 +1,9 @@
 import { FilterQuery } from "mongoose";
 import { ISite, Site } from "../../models";
-import { CreateSiteInput, SiteListQuery, UpdateSiteInput } from "./site.types";
+import { CreateSiteData, SiteListQuery, UpdateSiteInput } from "./site.types";
 
 export const createSite = async (
-    data: CreateSiteInput
+    data: CreateSiteData
 ): Promise<ISite> => {
 
     return Site.create(data);

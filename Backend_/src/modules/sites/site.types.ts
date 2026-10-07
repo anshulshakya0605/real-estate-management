@@ -3,15 +3,16 @@ import { City, SiteStatus, SiteType } from "../../shared/enums";
 
 
 export interface CreateSiteInput {
-    name: string;
+     name: string;
     description?: string;
 
     siteType: SiteType;
     city: City;
     address: string;
+
     location?: {
-        type: "Point",
-        coordinates: [number, number]
+        type: "Point";
+        coordinates: [number, number];
     };
 
     plotAreaSqFt?: number;
@@ -19,7 +20,32 @@ export interface CreateSiteInput {
 
     startDate?: Date;
     expectedEndDate?: Date;
+
     clientId: string;
+}
+
+export interface CreateSiteData {
+    name: string;
+    description?: string;
+
+    siteType: SiteType;
+    city: City;
+    address: string;
+
+    location?: {
+        type: "Point";
+        coordinates: [number, number];
+    };
+
+    plotAreaSqFt?: number;
+    budget?: number;
+
+    startDate?: Date;
+    expectedEndDate?: Date;
+
+    clientId: Types.ObjectId;
+    createdById: Types.ObjectId;
+    status: SiteStatus;
 }
 
 export interface UpdateSiteInput {
